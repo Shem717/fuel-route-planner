@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# Node/npm (in case you expand this project later)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Logs
+logs
+*.log
+*.log.*
+
+# Editor settings
+.vscode/
+.idea/
+*.swp
