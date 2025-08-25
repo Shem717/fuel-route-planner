@@ -36,10 +36,16 @@
     <header class="card">
       <h1>Fuel‑Route Planner</h1>
       <div class="tools" id="toolbar">
-        <label>Provider
-          <select id="provider" title="Price provider">
+        <label>Price source
+          <select id="priceProvider" title="Price provider">
             <option value="none">No prices</option>
             <option value="eia" selected>Attach EIA estimates</option>
+          </select>
+        </label>
+        <label>Routing API
+          <select id="routeProvider" title="Routing provider">
+            <option value="geoapify" selected>Geoapify</option>
+            <option value="google">Google</option>
           </select>
         </label>
         <label>Chains
@@ -182,21 +188,33 @@
         return js.routes[0].geometry;
       }
       async function routeGeoapify(start,end){
-        const truckHeightM = 4.115, truckWidthM=2.59, truckLengthM=22.86, truckWeightKg=36287;
         const haz = $('hazmat')? $('hazmat').checked:false;
-        const u=new URL('https://api.geoapify.com/v1/routing');
-        u.searchParams.set('waypoints', `${start[0]},${start[1]}|${end[0]},${end[1]}`);
-        u.searchParams.set('mode','drive'); u.searchParams.set('vehicle','truck');
-        u.searchParams.set('truckHeight',truckHeightM); u.searchParams.set('truckWidth',truckWidthM);
-        u.searchParams.set('truckLength',truckLengthM); u.searchParams.set('truckWeight',truckWeightKg);
+        const u=new URL('/api/directions');
+        u.searchParams.set('provider','geoapify');
+        u.searchParams.set('startLon', start[0]);
+        u.searchParams.set('startLat', start[1]);
+        u.searchParams.set('endLon', end[0]);
+        u.searchParams.set('endLat', end[1]);
         if(haz) u.searchParams.set('hazmat','true');
-        u.searchParams.set('details','instruction_details');
-        u.searchParams.set('apiKey',GEOAPIFY_KEY);
         const r=await fetch(u.toString());
         if(!r.ok) throw new Error('Geoapify routing error '+r.status);
         const j=await r.json();
-        if(!j?.features?.[0]) throw new Error('Geoapify routing: no route returned');
-        return j.features[0].geometry;
+        if(!j?.geometry) throw new Error('Geoapify routing: no route returned');
+        return j.geometry;
+      }
+
+      async function routeGoogle(start,end){
+        const u=new URL('/api/directions');
+        u.searchParams.set('provider','google');
+        u.searchParams.set('startLon', start[0]);
+        u.searchParams.set('startLat', start[1]);
+        u.searchParams.set('endLon', end[0]);
+        u.searchParams.set('endLat', end[1]);
+        const r=await fetch(u.toString());
+        if(!r.ok) throw new Error('Google routing error '+r.status);
+        const j=await r.json();
+        if(!j?.geometry) throw new Error('Google routing: no route returned');
+        return j.geometry;
       }
 
       // Distance + detour helpers
@@ -239,11 +257,12 @@
         for(const b of boxes){
           const degPerMiLat=1/69.0, degPerMiLon=1/(69.172*Math.cos(b.meanLat*Math.PI/180));
           const padLon=Math.max(detourMi,5)*degPerMiLon, padLat=Math.max(detourMi,5)*degPerMiLat;
-          const url=new URL('https://api.geoapify.com/v2/places');
-          url.searchParams.set('categories','service.vehicle.fuel,transport.truck_stop');
-          url.searchParams.set('filter',`rect:${b.minLon-padLon},${b.minLat-padLat},${b.maxLon+padLon},${b.maxLat+padLat}`);
-          url.searchParams.set('limit','500');
-          url.searchParams.set('apiKey',GEOAPIFY_KEY);
+          const url=new URL('/api/places');
+          url.searchParams.set('provider','geoapify');
+          url.searchParams.set('minLon', b.minLon-padLon);
+          url.searchParams.set('minLat', b.minLat-padLat);
+          url.searchParams.set('maxLon', b.maxLon+padLon);
+          url.searchParams.set('maxLat', b.maxLat+padLat);
           const r=await fetch(url.toString());
           if(!r.ok) throw new Error('Places error '+r.status);
           const j=await r.json();
@@ -257,6 +276,63 @@
           lat:f.geometry.coordinates[1], lon:f.geometry.coordinates[0],
           addr:[f.properties.housenumber,f.properties.street,f.properties.city,f.properties.state].filter(Boolean).join(', '),
           state:(f.properties.state_code || f.properties.state || '').toString().toUpperCase().replace('US-',''),
+          truckFriendly:true, dieselPrice:null, dieselPrice_note:null
+        })).filter(s=>{ if(seen.has(s.id)) return false; seen.add(s.id); return true; });
+        if(chainFilter==='major') list=list.filter(s=>major.some(m=>(s.brand||'').toLowerCase().includes(m.toLowerCase())));
+        if(chainFilter==='independent') list=list.filter(s=>!major.some(m=>(s.brand||'').toLowerCase().includes(m.toLowerCase())));
+        return list;
+      }
+
+      async function fetchStationsGoogle(geo, detourMi, chainFilter){
+        const coords=geo.coordinates;
+        const major=['Pilot','Flying J','Love\'s','TA','Petro','TA Express','Sapp Bros','Kwik Trip','Kwik Star','Maverik'];
+        function splitBoxes(cs, span=2){
+          const boxes=[]; let cur=[],minLon,maxLon,minLat,maxLat,sumLat=0;
+          for(const [lon,lat] of cs){
+            if(cur.length===0){
+              cur.push([lon,lat]);
+              minLon=maxLon=lon; minLat=maxLat=lat; sumLat=lat;
+            }else{
+              const nMinLon=Math.min(minLon,lon), nMaxLon=Math.max(maxLon,lon);
+              const nMinLat=Math.min(minLat,lat), nMaxLat=Math.max(maxLat,lat);
+              if((nMaxLon-nMinLon)>span || (nMaxLat-nMinLat)>span){
+                boxes.push({minLon,maxLon,minLat,maxLat,meanLat:sumLat/cur.length});
+                cur=[[lon,lat]];
+                minLon=maxLon=lon; minLat=maxLat=lat; sumLat=lat;
+              }else{
+                cur.push([lon,lat]);
+                minLon=nMinLon; maxLon=nMaxLon; minLat=nMinLat; maxLat=nMaxLat; sumLat+=lat;
+              }
+            }
+          }
+          if(cur.length) boxes.push({minLon,maxLon,minLat,maxLat,meanLat:sumLat/cur.length});
+          return boxes;
+        }
+        const boxes=splitBoxes(coords);
+        const feats=[];
+        for(const b of boxes){
+          const centerLat=(b.minLat+b.maxLat)/2;
+          const centerLon=(b.minLon+b.maxLon)/2;
+          const radius=Math.max(detourMi,5)*1609.34; // meters
+          const url=new URL('/api/places');
+          url.searchParams.set('provider','google');
+          url.searchParams.set('lat', centerLat);
+          url.searchParams.set('lon', centerLon);
+          url.searchParams.set('radius', radius.toFixed(0));
+          const r=await fetch(url.toString());
+          if(!r.ok) throw new Error('Places error '+r.status);
+          const j=await r.json();
+          feats.push(...(j.results||[]));
+        }
+        const seen=new Set();
+        let list=feats.map(f=>({
+          id:f.place_id||Math.random(),
+          name:f.name||'Fuel Station',
+          brand:f.name||'',
+          lat:f.geometry?.location?.lat,
+          lon:f.geometry?.location?.lng,
+          addr:f.vicinity||'',
+          state:(f.vicinity||'').split(',').pop()?.trim().split(' ').pop()?.toUpperCase()||'',
           truckFriendly:true, dieselPrice:null, dieselPrice_note:null
         })).filter(s=>{ if(seen.has(s.id)) return false; seen.add(s.id); return true; });
         if(chainFilter==='major') list=list.filter(s=>major.some(m=>(s.brand||'').toLowerCase().includes(m.toLowerCase())));
@@ -412,14 +488,16 @@
           const startQ=$('start').value.trim(); const endQ=$('end').value.trim();
           if(!startQ||!endQ){ note('error','Please enter both <b>Start</b> and <b>Destination</b>.'); return; }
           const [a,b]=await Promise.all([geocode(startQ), geocode(endQ)]);
+          const routeProv = $('routeProvider').value;
           let geo=null;
-          try { geo = await routeGeoapify(a,b); } catch(_) { geo = await routeOSRM(a,b); }
+          if(routeProv==='google') geo = await routeGoogle(a,b);
+          else try { geo = await routeGeoapify(a,b); } catch(_) { geo = await routeOSRM(a,b); }
           const detour = readDetour();
           const chain  = $('chainFilter').value;
-          const provider = $('provider').value;
+          const priceProv = $('priceProvider').value;
 
-          let stns = await fetchStationsGeoapify(geo, detour, chain);
-          if(provider==='eia'){
+          let stns = routeProv==='google' ? await fetchStationsGoogle(geo, detour, chain) : await fetchStationsGeoapify(geo, detour, chain);
+          if(priceProv==='eia'){
             try{ stns = await enrichWithEIA(stns); }catch(e){ stns.forEach(s=>{ if(s.dieselPrice==null){ s.dieselPrice=3.95; s.dieselPrice_note='EIA U.S. avg. (fallback)'; } }); }
           }
 
@@ -437,7 +515,7 @@
       // Wire up UI
       $('planBtn').onclick=async()=>{ const btn=$('planBtn'); btn.disabled=true; btn.textContent='Planning…'; try{ await plan(); } finally { btn.disabled=false; btn.textContent='Plan Route'; } };
       $('resetBtn').onclick=()=>location.reload();
-      $('sortBy').onchange=plan; $('chainFilter').onchange=plan; $('provider').onchange=plan;
+      $('sortBy').onchange=plan; $('chainFilter').onchange=plan; $('priceProvider').onchange=plan; $('routeProvider').onchange=plan;
       attachAutocomplete('start','startList'); attachAutocomplete('end','endList');
     </script>
   </div>
