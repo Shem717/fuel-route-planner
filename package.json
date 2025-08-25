@@ -1,0 +1,14 @@
+{
+  "name": "fuel-route-planner",
+  "version": "1.0.0",
+  "description": "A self-contained web app for planning semi-truck fuel routes with: - **Truck-aware routing** (Geoapify Routing API) - **Fuel stop discovery** (Geoapify Places API) - **Diesel price estimates** from the **U.S. Energy Information Administration (EIA)** - **AI-based recommendations** that adjust for weight, terrain, governed speed, wind, and reserve buffer.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node -c server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
