@@ -255,4 +255,161 @@
 
       // Vehicle + AI planner
       function readVehicle(){
-        const tank=parseFloat($('tank').value||'
+        const tank=parseFloat($('tank').value||'160');
+        let fuel=parseFloat($('fuelVal').value||'0'); if(($('fuelUnit').value||'gal')==='pct') fuel = tank*(fuel/100);
+        const reserve=parseFloat($('reserve').value||'0');
+        const mpgBase=parseFloat($('mpg').value||'8');
+        const weight=parseFloat($('weight').value||'80000');
+        const terrain=$('terrain').value||'rolling';
+        const govSpeed=parseFloat($('govSpeed').value||'70');
+        const wind=parseFloat($('wind').value||'0');
+        const driverCost=parseFloat($('driverCost').value||'122');
+        const terrainFactor = {flat:1.00, rolling:0.95, hilly:0.90, mountain:0.80}[terrain]||0.95;
+        const weightFactor = Math.max(0.7, 1 - Math.max(0, (weight-60000))/10000*0.03);
+        const speedFactor = Math.max(0.7, 1 - Math.max(0, (govSpeed-60))/5*0.02);
+        const windFactor = Math.max(0.75, 1 - Math.max(0, wind)*0.004);
+        const mpgEff = mpgBase * terrainFactor * weightFactor * speedFactor * windFactor;
+        return {tank,fuel,reserve,mpgBase,mpgEff,govSpeed,driverCost};
+      }
+      function aiRecommend(routeGeo, stations){
+        const {tank,fuel,reserve,mpgEff}=readVehicle();
+        const coords=routeGeo.coordinates;
+        const withMiles = stations.map(s=>{ const idx=nearestIndexOnRoute({lat:s.lat,lon:s.lon},coords); const m=pathDist(coords,0,idx)*MI_PER_M; return {...s, milesFromStart:m}; }).sort((a,b)=>a.milesFromStart-b.milesFromStart);
+        const totalMiles = pathDist(coords,0,coords.length-1)*MI_PER_M;
+        const maxRange = tank*mpgEff;
+        let posMiles = 0, fuelGal = fuel;
+        const plan=[];
+        function chooseNext(pos, range){
+          const reachable = withMiles.filter(s=> s.milesFromStart>pos && s.milesFromStart <= pos + range - reserve + 1e-6);
+          if(reachable.length===0) return null;
+          return reachable.reduce((best,cur)=> ((cur.dieselPrice??Infinity) < (best?.dieselPrice??Infinity)) ? cur : best, null);
+        }
+        function needBeforeStart(){
+          const canReach = chooseNext(0, fuelGal*mpgEff);
+          if(!canReach){
+            const needMiles = Math.max(0, (withMiles[0]?.milesFromStart||totalMiles) + reserve - fuelGal*mpgEff);
+            const needGal = needMiles/mpgEff;
+            plan.push({type:'prestart', action:`Buy ${needGal.toFixed(1)} gal before departure to reach first stop.`});
+            fuelGal += needGal;
+          }
+        }
+        needBeforeStart();
+        while(posMiles < totalMiles - 1){
+          const curRange = fuelGal*mpgEff;
+          if(posMiles + curRange >= totalMiles){
+            plan.push({type:'finish', action:`You can finish the trip without refueling. Remaining fuel at arrival ≈ ${((curRange-(totalMiles-posMiles))/mpgEff).toFixed(1)} gal.`});
+            break;
+          }
+          const target = chooseNext(posMiles, curRange);
+          if(!target){
+            const needMore = ((withMiles.find(s=>s.milesFromStart>posMiles)?.milesFromStart||totalMiles) + reserve - (posMiles+curRange))/mpgEff;
+            plan.push({type:'gap', action:`Insufficient range window; increase starting fuel by ${needMore.toFixed(1)} gal or reduce reserve.`});
+            break;
+          }
+          const milesTo = target.milesFromStart - posMiles;
+          fuelGal = Math.max(0, fuelGal - milesTo/mpgEff);
+          posMiles = target.milesFromStart;
+          const nextCheaper = withMiles.find(s=> s.milesFromStart>posMiles && (s.dieselPrice??Infinity) < (target.dieselPrice??Infinity) && (s.milesFromStart - posMiles) <= maxRange - reserve);
+          let buyGal;
+          if(nextCheaper){
+            const needMiles = nextCheaper.milesFromStart - posMiles + reserve;
+            const needGal = Math.max(0, needMiles/mpgEff - fuelGal);
+            buyGal = Math.min( tank - fuelGal, needGal );
+          }else{
+            const remMiles = totalMiles - posMiles + reserve;
+            const needGal = Math.max(0, remMiles/mpgEff - fuelGal);
+            buyGal = Math.min( tank - fuelGal, needGal );
+          }
+          const estPrice = target.dieselPrice ?? null;
+          const estCost = estPrice!=null ? buyGal*estPrice : null;
+          plan.push({type:'stop', station:target, gallons:buyGal, cost:estCost});
+          fuelGal += buyGal;
+        }
+        return {plan, mpgEff, maxRange, totalMiles};
+      }
+      function renderPlan(out){
+        const box=$('recoPlan'); box.innerHTML='';
+        const sum=$('recoSummary');
+        sum.innerHTML = `<div class="kvs"><div>Effective MPG</div><div class="mono">${out.mpgEff.toFixed(2)}</div><div>Max range (full tank)</div><div class="mono">${out.maxRange.toFixed(0)} mi</div><div>Total route</div><div class="mono">${out.totalMiles.toFixed(0)} mi</div></div>`;
+        if(out.plan.length===0){ box.innerHTML='<div class="muted">No actions needed.</div>'; return; }
+        out.plan.forEach(step=>{
+          const row=document.createElement('div'); row.className='station';
+          if(step.type==='stop'){
+            row.innerHTML=`<div><b>Stop at:</b> ${step.station.name} <span class="muted">(${step.station.addr||'coords'})</span>
+              <div>Buy <b>${step.gallons.toFixed(1)} gal</b>${step.cost!=null?` @ ~$${(step.station.dieselPrice).toFixed(3)}/gal ≈ <b>$${step.cost.toFixed(2)}</b>`:''}</div>
+              <div class="muted">Milepost: ${step.station.milesFromStart.toFixed(1)} · Price source: ${step.station.dieselPrice_note||'—'}</div>
+            </div>`;
+          }else{
+            row.innerHTML=`<div>${step.action}</div>`;
+          }
+          box.appendChild(row);
+        });
+      }
+
+      // Stations UI
+      function renderStations(routeGeo, stations){
+        const sort = $('sortBy').value;
+        const coords=routeGeo.coordinates;
+        const annotated = stations.map(s=>{ const idx=nearestIndexOnRoute({lat:s.lat,lon:s.lon},coords); const milesFromStart=pathDist(coords,0,idx)*MI_PER_M; return {...s, idx, milesFromStart}; });
+        let items = annotated;
+        if(sort==='distance') items = annotated.slice().sort((a,b)=>a.milesFromStart-b.milesFromStart);
+        else if(sort==='price') items = annotated.slice().sort((a,b)=> (a.dieselPrice??Infinity)-(b.dieselPrice??Infinity));
+        else items = annotated.slice().sort((a,b)=>a.idx-b.idx);
+        const host=$('stations'); host.innerHTML='';
+        if(items.length===0){ host.innerHTML='<div class="muted">No stations found within your detour/filters for this route. Try widening detour or allowing all chains.</div>'; return; }
+        items.forEach(s=>{
+          const maps=`https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lon}`;
+          const priceStr = s.dieselPrice!=null? `$${s.dieselPrice.toFixed(3)}/gal` : '—';
+          const note = s.dieselPrice_note? ` <span class="muted">(${s.dieselPrice_note})</span>`:'';
+          const major=['Pilot','Flying J','Love\'s','TA','Petro','TA Express','Sapp Bros','Kwik Trip','Kwik Star','Maverik'];
+          const chainType=major.some(m=>(s.brand||'').toLowerCase().includes(m.toLowerCase()))?'Major':'Independent';
+          const row=document.createElement('div'); row.className='station';
+          row.innerHTML=`<div><b>${s.name}</b><div class="muted">${s.addr||''}</div>
+            <div style="margin-top:4px">Brand: <span class="badge">${s.brand||'—'}</span> · Chain: <span class="badge">${chainType}</span></div>
+            <div style="margin-top:4px">Diesel: <b>${priceStr}</b>${note}</div>
+            <div style="margin-top:4px">Distance from start: <b>${s.milesFromStart.toFixed(1)} mi</b></div>
+            <div style="margin-top:4px"><a href="${maps}" target="_blank">Open in Maps</a></div>
+          </div>`;
+          host.appendChild(row);
+        });
+      }
+
+      // Plan handler
+      async function plan(){
+        try{
+          $('loading').style.display='flex';
+          note('','');
+          const startQ=$('start').value.trim(); const endQ=$('end').value.trim();
+          if(!startQ||!endQ){ note('error','Please enter both <b>Start</b> and <b>Destination</b>.'); return; }
+          const [a,b]=await Promise.all([geocode(startQ), geocode(endQ)]);
+          let geo=null;
+          try { geo = await routeGeoapify(a,b); } catch(_) { geo = await routeOSRM(a,b); }
+          const detour = readDetour();
+          const chain  = $('chainFilter').value;
+          const provider = $('provider').value;
+
+          let stns = await fetchStationsGeoapify(geo, detour, chain);
+          if(provider==='eia'){
+            try{ stns = await enrichWithEIA(stns); }catch(e){ stns.forEach(s=>{ if(s.dieselPrice==null){ s.dieselPrice=3.95; s.dieselPrice_note='EIA U.S. avg. (fallback)'; } }); }
+          }
+
+          renderStations(geo, stns);
+          note('ok','Route and stations loaded.');
+
+          $('recoBtn').onclick=()=>{ const out=aiRecommend(geo, stns); renderPlan(out); };
+        }catch(e){
+          note('error', e.message);
+        }finally{
+          $('loading').style.display='none';
+        }
+      }
+
+      // Wire up UI
+      $('planBtn').onclick=async()=>{ const btn=$('planBtn'); btn.disabled=true; btn.textContent='Planning…'; try{ await plan(); } finally { btn.disabled=false; btn.textContent='Plan Route'; } };
+      $('resetBtn').onclick=()=>location.reload();
+      $('sortBy').onchange=plan; $('chainFilter').onchange=plan; $('provider').onchange=plan;
+      attachAutocomplete('start','startList'); attachAutocomplete('end','endList');
+    </script>
+  </div>
+</body>
+</html>
