@@ -63,6 +63,16 @@
     </header>
 
     <section class="card" style="margin-top:12px">
+      <h2>Favorites</h2>
+      <div id="favorites"></div>
+    </section>
+
+    <section class="card" style="margin-top:12px">
+      <h2>Recent Routes</h2>
+      <div id="history"></div>
+    </section>
+
+    <section class="card" style="margin-top:12px">
       <div class="row">
         <label><span class="small muted">Start (exact address OK)</span>
           <input id="start" placeholder="6418 Centennial Blvd, Nashville, TN 37209" list="startList" autocomplete="off" />
@@ -404,6 +414,47 @@
         });
       }
 
+      // Favorites and History
+      async function loadStored(){
+        try{
+          const [hist, fav] = await Promise.all([
+            fetch('/api/routes').then(r=>r.json()),
+            fetch('/api/favorites').then(r=>r.json())
+          ]);
+          renderHistory(hist);
+          renderFavorites(fav);
+        }catch(e){ console.error(e); }
+      }
+      function renderHistory(items){
+        const host=$('history'); host.innerHTML='';
+        if(!items.length){ host.innerHTML='<div class="muted">No recent routes</div>'; return; }
+        items.forEach(r=>{
+          const row=document.createElement('div'); row.className='station';
+          row.innerHTML=`<div>${r.start} → ${r.end}</div><button data-id="${r.id}" class="btn small favbtn">${r.favorite?'Unfavorite':'Favorite'}</button>`;
+          host.appendChild(row);
+        });
+        host.querySelectorAll('.favbtn').forEach(btn=>{
+          btn.onclick=async()=>{
+            const id=btn.getAttribute('data-id');
+            if(btn.textContent==='Favorite'){
+              await fetch('/api/favorites',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+            }else{
+              await fetch('/api/favorites/'+id,{method:'DELETE'});
+            }
+            await loadStored();
+          };
+        });
+      }
+      function renderFavorites(items){
+        const host=$('favorites'); host.innerHTML='';
+        if(!items.length){ host.innerHTML='<div class="muted">No favorites</div>'; return; }
+        items.forEach(r=>{
+          const row=document.createElement('div'); row.className='station';
+          row.innerHTML=`<div>${r.start} → ${r.end}</div>`;
+          host.appendChild(row);
+        });
+      }
+
       // Plan handler
       async function plan(){
         try{
@@ -426,6 +477,9 @@
           renderStations(geo, stns);
           note('ok','Route and stations loaded.');
 
+          await fetch('/api/routes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({start:startQ,end:endQ})});
+          await loadStored();
+
           $('recoBtn').onclick=()=>{ const out=aiRecommend(geo, stns); renderPlan(out); };
         }catch(e){
           note('error', e.message);
@@ -439,6 +493,7 @@
       $('resetBtn').onclick=()=>location.reload();
       $('sortBy').onchange=plan; $('chainFilter').onchange=plan; $('provider').onchange=plan;
       attachAutocomplete('start','startList'); attachAutocomplete('end','endList');
+      loadStored();
     </script>
   </div>
 </body>
