@@ -138,8 +138,7 @@
     <script>
       const $=id=>document.getElementById(id);
       const MI_PER_M=1/1609.344; 
-      const GEOAPIFY_KEY='9a30d1fe0c684c489f1ff7f506e9a1ff'; 
-      const EIA_KEY='xfGagmkwAlzScExC639DPUctyuWheqZSQPfxErvu';
+      
       function note(kind,msg){ const el=$('alerts'); el.className = 'small '+(kind==='ok'?'ok':kind==='error'?'error':'muted'); el.innerHTML=msg; }
 
       // Autocomplete (Geoapify)
@@ -152,11 +151,11 @@
           if(q.length<3){ list.innerHTML=''; return; }
           suggestTimer=setTimeout(async()=>{
             try{
-              const u=new URL('https://api.geoapify.com/v1/geocode/autocomplete');
+              const u=new URL('/geocode', location.origin);
+              u.searchParams.set('type','autocomplete');
               u.searchParams.set('text', q);
               u.searchParams.set('limit','8');
-              u.searchParams.set('apiKey', GEOAPIFY_KEY);
-              const j=await fetch(u.toString()).then(r=>r.json());
+              const j=await fetch(u).then(r=>r.json());
               const uniq=[...new Set((j.features||[]).map(f=>f.properties.formatted))];
               list.innerHTML=uniq.map(v=>`<option value="${v}"></option>`).join('');
             }catch{}
@@ -166,11 +165,10 @@
 
       // Geocode + routing (Geoapify fallback to OSRM)
       async function geocode(q){
-        const u=new URL('https://api.geoapify.com/v1/geocode/search');
+        const u=new URL('/geocode', location.origin);
         u.searchParams.set('text', q);
         u.searchParams.set('limit','1');
-        u.searchParams.set('apiKey', GEOAPIFY_KEY);
-        const j=await fetch(u.toString()).then(r=>r.json());
+        const j=await fetch(u).then(r=>r.json());
         const f=j.features?.[0];
         if(!f) throw new Error('Location not found: '+q);
         return [f.geometry.coordinates[0], f.geometry.coordinates[1]];
@@ -184,15 +182,14 @@
       async function routeGeoapify(start,end){
         const truckHeightM = 4.115, truckWidthM=2.59, truckLengthM=22.86, truckWeightKg=36287;
         const haz = $('hazmat')? $('hazmat').checked:false;
-        const u=new URL('https://api.geoapify.com/v1/routing');
+        const u=new URL('/route', location.origin);
         u.searchParams.set('waypoints', `${start[0]},${start[1]}|${end[0]},${end[1]}`);
         u.searchParams.set('mode','drive'); u.searchParams.set('vehicle','truck');
         u.searchParams.set('truckHeight',truckHeightM); u.searchParams.set('truckWidth',truckWidthM);
         u.searchParams.set('truckLength',truckLengthM); u.searchParams.set('truckWeight',truckWeightKg);
         if(haz) u.searchParams.set('hazmat','true');
         u.searchParams.set('details','instruction_details');
-        u.searchParams.set('apiKey',GEOAPIFY_KEY);
-        const r=await fetch(u.toString());
+        const r=await fetch(u);
         if(!r.ok) throw new Error('Geoapify routing error '+r.status);
         const j=await r.json();
         if(!j?.features?.[0]) throw new Error('Geoapify routing: no route returned');
@@ -239,12 +236,11 @@
         for(const b of boxes){
           const degPerMiLat=1/69.0, degPerMiLon=1/(69.172*Math.cos(b.meanLat*Math.PI/180));
           const padLon=Math.max(detourMi,5)*degPerMiLon, padLat=Math.max(detourMi,5)*degPerMiLat;
-          const url=new URL('https://api.geoapify.com/v2/places');
+          const url=new URL('/places', location.origin);
           url.searchParams.set('categories','service.vehicle.fuel,transport.truck_stop');
           url.searchParams.set('filter',`rect:${b.minLon-padLon},${b.minLat-padLat},${b.maxLon+padLon},${b.maxLat+padLat}`);
           url.searchParams.set('limit','500');
-          url.searchParams.set('apiKey',GEOAPIFY_KEY);
-          const r=await fetch(url.toString());
+          const r=await fetch(url);
           if(!r.ok) throw new Error('Places error '+r.status);
           const j=await r.json();
           feats.push(...(j.features||[]));
@@ -267,8 +263,11 @@
       // EIA prices (state → PADD → US)
       const STATE_TO_PADD={ CT:'R1A',ME:'R1A',MA:'R1A',NH:'R1A',RI:'R1A',VT:'R1A', DE:'R1B',DC:'R1B',MD:'R1B',NJ:'R1B',NY:'R1B',PA:'R1B', FL:'R1C',GA:'R1C',NC:'R1C',SC:'R1C',VA:'R1C',WV:'R1C', IL:'R20',IN:'R20',IA:'R20',KS:'R20',KY:'R20',MI:'R20',MN:'R20',MO:'R20',NE:'R20',ND:'R20',OH:'R20',OK:'R20',SD:'R20',TN:'R20',WI:'R20', AL:'R30',AR:'R30',LA:'R30',MS:'R30',NM:'R30',TX:'R30', CO:'R40',ID:'R40',MT:'R40',UT:'R40',WY:'R40', AK:'R50',AZ:'R50',CA:'R50',HI:'R50',NV:'R50',OR:'R50',WA:'R50' };
       async function eiaLatest(area, product='EPD2D', series){ const s = series|| (area.startsWith('R')||area==='NUS' ? 'dpr' : 'gnd');
-        const url=`https://api.eia.gov/v2/petroleum/pri/${s}/data/?api_key=${EIA_KEY}&frequency=weekly&data[0]=value&facets[product][]=${product}&facets[area][]=${area}&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1`;
-        const r=await fetch(url); if(!r.ok) throw new Error('EIA '+r.status); const j=await r.json(); return j?.response?.data?.[0]?.value ?? null; }
+        const u=new URL('/prices', location.origin);
+        u.searchParams.set('area', area);
+        u.searchParams.set('product', product);
+        u.searchParams.set('series', s);
+        const r=await fetch(u); if(!r.ok) throw new Error('Prices '+r.status); const j=await r.json(); return j?.value ?? null; }
       async function enrichWithEIA(stations){
         const groups={}; stations.forEach(s=>{ const st=s.state||''; (groups[st] ||= []).push(s); });
         const cache=new Map();
