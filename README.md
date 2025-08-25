@@ -31,6 +31,7 @@ A self-contained web app for planning semi-truck fuel routes with:
 Click **Reset** to clear inputs.
 
 ## APIs used
+- [Geoapify Geocoding API](https://apidocs.geoapify.com/) — Address lookup & autocomplete.
 - [Geoapify Routing API](https://apidocs.geoapify.com/) — Truck-aware routing.
 - [Geoapify Places API](https://apidocs.geoapify.com/) — Truck stops & fuel stations.
 - [EIA v2 Petroleum Prices API](https://www.eia.gov/opendata/) — Diesel price estimates.
