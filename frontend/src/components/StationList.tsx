@@ -1,32 +1,29 @@
 import React from 'react';
 import { Station } from '../types';
+import Map from './Map';
 
 interface Props {
   stations: Station[];
 }
 
 const StationList: React.FC<Props> = ({ stations }) => (
-  <section className="card" style={{ marginTop: 12 }}>
+  <section className="card mt-3">
     <h2>Stations</h2>
-    <div className="list">
+    <Map stations={stations} />
+    <div className="stations-grid mt-2">
       {stations.length === 0 ? (
         <div className="muted">No stations loaded.</div>
       ) : (
         stations.map((s) => (
-          <div className="station" key={`${s.lat}-${s.lon}`}>
-            <div>
+          <div className="station-card" key={`${s.lat}-${s.lon}`}>
+            <div className="station-card-body">
               <b>{s.name}</b>
               <div className="muted">{s.addr}</div>
-              <div style={{ marginTop: 4 }}>
+              <div className="mt-1">
                 Brand: <span className="badge">{s.brand ?? '—'}</span>
               </div>
-              <div style={{ marginTop: 4 }}>
-                Diesel:{' '}
-                <b>
-                  {s.dieselPrice != null
-                    ? `$${s.dieselPrice.toFixed(3)}/gal`
-                    : '—'}
-                </b>
+              <div className="mt-1">
+                Diesel: <b>{s.dieselPrice != null ? `$${s.dieselPrice.toFixed(3)}/gal` : '—'}</b>
               </div>
             </div>
             <div className="small">{s.milesFromStart.toFixed(1)} mi</div>
