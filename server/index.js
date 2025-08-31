@@ -1,61 +1,61 @@
 const express = require('express');
+const { connectDB } = require('./db');
+const { Favorite } = require('./models/Favorite');
+const { RouteHistory } = require('./models/RouteHistory');
+
+connectDB();
+
 const app = express();
+app.use(express.json());
 
 const GEOAPIFY_KEY = process.env.GEOAPIFY_KEY;
 const EIA_KEY = process.env.EIA_KEY;
 
+// Proxy endpoints
 app.get('/geocode', async (req, res) => {
   const { type, ...params } = req.query;
   const endpoint = type === 'autocomplete' ? 'autocomplete' : 'search';
   const url = new URL(`https://api.geoapify.com/v1/geocode/${endpoint}`);
-  for (const [k, v] of Object.entries(params)) {
-    url.searchParams.set(k, v);
-  }
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   url.searchParams.set('apiKey', GEOAPIFY_KEY);
   try {
     const r = await fetch(url);
     const data = await r.json();
     res.status(r.status).json(data);
-  } catch (e) {
+  } catch {
     res.status(500).json({ error: 'Geocode error' });
   }
 });
 
 app.get('/route', async (req, res) => {
   const url = new URL('https://api.geoapify.com/v1/routing');
-  for (const [k, v] of Object.entries(req.query)) {
-    url.searchParams.set(k, v);
-  }
+  for (const [k, v] of Object.entries(req.query)) url.searchParams.set(k, v);
   url.searchParams.set('apiKey', GEOAPIFY_KEY);
   try {
     const r = await fetch(url);
     const data = await r.json();
     res.status(r.status).json(data);
-  } catch (e) {
+  } catch {
     res.status(500).json({ error: 'Route error' });
   }
 });
 
 app.get('/places', async (req, res) => {
   const url = new URL('https://api.geoapify.com/v2/places');
-  for (const [k, v] of Object.entries(req.query)) {
-    url.searchParams.set(k, v);
-  }
+  for (const [k, v] of Object.entries(req.query)) url.searchParams.set(k, v);
   url.searchParams.set('apiKey', GEOAPIFY_KEY);
   try {
     const r = await fetch(url);
     const data = await r.json();
     res.status(r.status).json(data);
-  } catch (e) {
+  } catch {
     res.status(500).json({ error: 'Places error' });
   }
 });
 
 app.get('/prices', async (req, res) => {
   const { area, product, series } = req.query;
-  if (!area) {
-    return res.status(400).json({ error: 'area required' });
-  }
+  if (!area) return res.status(400).json({ error: 'area required' });
   const url = new URL(`https://api.eia.gov/v2/petroleum/pri/${series}/data/`);
   url.searchParams.set('api_key', EIA_KEY);
   url.searchParams.set('frequency', 'weekly');
@@ -69,16 +69,103 @@ app.get('/prices', async (req, res) => {
   try {
     const r = await fetch(url);
     const j = await r.json();
-    const value = j?.response?.data?.[0]?.value ?? null;
-    res.status(r.status).json({ value });
-  } catch (e) {
+    res.status(r.status).json({ value: j?.response?.data?.[0]?.value ?? null });
+  } catch {
     res.status(500).json({ error: 'Prices error' });
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// Favorites CRUD
+app.post('/favorites', async (req, res) => {
+  try {
+    const favorite = await Favorite.create(req.body);
+    res.status(201).json(favorite);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
+
+app.get('/favorites', async (req, res) => {
+  const favorites = await Favorite.find();
+  res.json(favorites);
+});
+
+app.get('/favorites/:id', async (req, res) => {
+  try {
+    const favorite = await Favorite.findById(req.params.id);
+    if (!favorite) return res.status(404).json({ error: 'Not found' });
+    res.json(favorite);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/favorites/:id', async (req, res) => {
+  try {
+    const favorite = await Favorite.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!favorite) return res.status(404).json({ error: 'Not found' });
+    res.json(favorite);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/favorites/:id', async (req, res) => {
+  try {
+    const favorite = await Favorite.findByIdAndDelete(req.params.id);
+    if (!favorite) return res.status(404).json({ error: 'Not found' });
+    res.json({ message: 'Deleted' });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Route history CRUD
+app.post('/route-history', async (req, res) => {
+  try {
+    const history = await RouteHistory.create(req.body);
+    res.status(201).json(history);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/route-history', async (req, res) => {
+  const history = await RouteHistory.find();
+  res.json(history);
+});
+
+app.get('/route-history/:id', async (req, res) => {
+  try {
+    const history = await RouteHistory.findById(req.params.id);
+    if (!history) return res.status(404).json({ error: 'Not found' });
+    res.json(history);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/route-history/:id', async (req, res) => {
+  try {
+    const history = await RouteHistory.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!history) return res.status(404).json({ error: 'Not found' });
+    res.json(history);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/route-history/:id', async (req, res) => {
+  try {
+    const history = await RouteHistory.findByIdAndDelete(req.params.id);
+    if (!history) return res.status(404).json({ error: 'Not found' });
+    res.json({ message: 'Deleted' });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
 module.exports = app;
