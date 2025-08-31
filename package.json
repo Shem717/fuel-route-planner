@@ -1,16 +1,17 @@
-{
-  "name": "fuel-route-planner",
-  "version": "1.0.0",
-  "type": "module",
-  "scripts": {
-    "start": "node server.js",
-    "test": "node -e \"console.log('no tests')\""
-  },
-  "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^4.18.2",
-    "sqlite": "^4.2.1",
-    "sqlite3": "^5.1.6"
-  }
-}
-
+diff --git a//dev/null b/package.json
+index 0000000000000000000000000000000000000000..7b81967370eed685b364f6fbcabcd7ea14c102f5 100644
+--- a//dev/null
++++ b/package.json
+@@ -0,0 +1,12 @@
++{
++  "name": "fuel-route-planner",
++  "version": "1.0.0",
++  "type": "module",
++  "main": "server.js",
++  "scripts": {
++    "start": "node server.js"
++  },
++  "dependencies": {
++    "express": "^4.18.2"
++  }
++}
