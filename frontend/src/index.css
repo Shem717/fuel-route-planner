@@ -26,6 +26,12 @@ input,select{width:100%;padding:10px 12px;border-radius:12px;border:1px solid va
 .loading{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.35);z-index:9999}
 .spinner{width:36px;height:36px;border:4px solid rgba(255,255,255,.3);border-top-color:#3b82f6;border-radius:50%;animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+.layout{display:grid;grid-template-columns:200px 1fr;grid-template-rows:60px 1fr;grid-template-areas:"sidebar topbar" "sidebar main";height:100vh}
+.sidebar{grid-area:sidebar;background:var(--panel);display:flex;flex-direction:column;padding:1rem;border-right:1px solid var(--border)}
+.sidebar ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.5rem}
+.nav-item{cursor:pointer;padding:.5rem 0}
+.top-bar{grid-area:topbar;background:var(--panel);display:flex;align-items:center;padding:0 1rem;border-bottom:1px solid var(--border)}
+.content{grid-area:main;padding:1rem;overflow-y:auto}
 @media (max-width:600px){
  .row{grid-template-columns:1fr}
  .row-3{grid-template-columns:1fr}
