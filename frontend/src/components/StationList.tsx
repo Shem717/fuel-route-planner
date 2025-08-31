@@ -6,7 +6,7 @@ interface Props {
 }
 
 const StationList: React.FC<Props> = ({ stations }) => (
-  <section className="card" style={{ marginTop: 12 }}>
+  <section className="card mt-12">
     <h2>Stations</h2>
     <div className="list">
       {stations.length === 0 ? (
@@ -17,10 +17,10 @@ const StationList: React.FC<Props> = ({ stations }) => (
             <div>
               <b>{s.name}</b>
               <div className="muted">{s.addr}</div>
-              <div style={{ marginTop: 4 }}>
+              <div className="mt-4">
                 Brand: <span className="badge">{s.brand ?? '—'}</span>
               </div>
-              <div style={{ marginTop: 4 }}>
+              <div className="mt-4">
                 Diesel:{' '}
                 <b>
                   {s.dieselPrice != null

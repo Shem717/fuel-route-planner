@@ -36,7 +36,7 @@ const RouteForm: React.FC<Props> = ({ onPlan }) => {
   };
 
   return (
-    <form className="card" onSubmit={submit} style={{ marginTop: 12 }}>
+    <form className="card mt-12" onSubmit={submit}>
       <div className="row">
         <label>
           <span className="small muted">Start (exact address OK)</span>
@@ -47,7 +47,7 @@ const RouteForm: React.FC<Props> = ({ onPlan }) => {
           <input name="end" value={values.end} onChange={update} />
         </label>
       </div>
-      <div className="row" style={{ marginTop: 8 }}>
+      <div className="row mt-8">
         <label>
           <span className="small muted">Route provider</span>
           <select
@@ -60,7 +60,7 @@ const RouteForm: React.FC<Props> = ({ onPlan }) => {
           </select>
         </label>
       </div>
-      <div className="row-3" style={{ marginTop: 8 }}>
+      <div className="row-3 mt-8">
         <label>
           <span className="small muted">Base MPG</span>
           <input
@@ -102,7 +102,7 @@ const RouteForm: React.FC<Props> = ({ onPlan }) => {
           </div>
         </label>
       </div>
-      <div className="row-3" style={{ marginTop: 8 }}>
+      <div className="row-3 mt-8">
         <label>
           <span className="small muted">Reserve buffer (miles)</span>
           <input
@@ -133,7 +133,7 @@ const RouteForm: React.FC<Props> = ({ onPlan }) => {
           </select>
         </label>
       </div>
-      <div className="row-3" style={{ marginTop: 8 }}>
+      <div className="row-3 mt-8">
         <label>
           <span className="small muted">Governed speed (mph)</span>
           <input
@@ -165,10 +165,8 @@ const RouteForm: React.FC<Props> = ({ onPlan }) => {
           />
         </label>
       </div>
-      <div style={{ marginTop: 8 }}>
-        <button type="submit" className="btn primary">
-          Plan Route
-        </button>
+      <div className="mt-8">
+        <button type="submit" className="btn primary">Plan Route</button>
       </div>
     </form>
   );
