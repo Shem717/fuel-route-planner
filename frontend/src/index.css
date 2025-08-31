@@ -32,6 +32,7 @@ input,select{width:100%;padding:10px 12px;border-radius:12px;border:1px solid va
 .nav-item{cursor:pointer;padding:.5rem 0}
 .top-bar{grid-area:topbar;background:var(--panel);display:flex;align-items:center;padding:0 1rem;border-bottom:1px solid var(--border)}
 .content{grid-area:main;padding:1rem;overflow-y:auto}
+/* Mobile adjustments */
 @media (max-width:600px){
  .row{grid-template-columns:1fr}
  .row-3{grid-template-columns:1fr}
