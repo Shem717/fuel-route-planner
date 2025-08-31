@@ -11,6 +11,7 @@ export interface RouteFormValues {
   govSpeed: number;
   wind?: number;
   driverCost: number;
+  routeProvider: 'geoapify' | 'google';
 }
 
 export interface Station {

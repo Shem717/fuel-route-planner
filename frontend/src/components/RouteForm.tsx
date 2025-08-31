@@ -19,6 +19,7 @@ const RouteForm: React.FC<Props> = ({ onPlan }) => {
     govSpeed: 70,
     wind: undefined,
     driverCost: 122,
+    routeProvider: 'geoapify',
   });
 
   const update = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -44,6 +45,19 @@ const RouteForm: React.FC<Props> = ({ onPlan }) => {
         <label>
           <span className="small muted">Destination (exact address OK)</span>
           <input name="end" value={values.end} onChange={update} />
+        </label>
+      </div>
+      <div className="row" style={{ marginTop: 8 }}>
+        <label>
+          <span className="small muted">Route provider</span>
+          <select
+            name="routeProvider"
+            value={values.routeProvider}
+            onChange={update}
+          >
+            <option value="geoapify">geoapify</option>
+            <option value="google">google</option>
+          </select>
         </label>
       </div>
       <div className="row-3" style={{ marginTop: 8 }}>
