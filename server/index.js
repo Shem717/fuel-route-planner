@@ -9,7 +9,33 @@ const app = express();
 app.use(express.json());
 
 const GEOAPIFY_KEY = process.env.GEOAPIFY_KEY;
+const GOOGLE_KEY = process.env.GOOGLE_KEY;
 const EIA_KEY = process.env.EIA_KEY;
+
+function decodePolyline(str) {
+  let index = 0, lat = 0, lng = 0, coordinates = [];
+  while (index < str.length) {
+    let b, shift = 0, result = 0;
+    do {
+      b = str.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    const dlat = (result & 1) ? ~(result >> 1) : (result >> 1);
+    lat += dlat;
+    shift = 0;
+    result = 0;
+    do {
+      b = str.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    const dlng = (result & 1) ? ~(result >> 1) : (result >> 1);
+    lng += dlng;
+    coordinates.push([lng / 1e5, lat / 1e5]);
+  }
+  return coordinates;
+}
 
 // Proxy endpoints
 app.get('/geocode', async (req, res) => {
@@ -28,28 +54,73 @@ app.get('/geocode', async (req, res) => {
 });
 
 app.get('/route', async (req, res) => {
-  const url = new URL('https://api.geoapify.com/v1/routing');
-  for (const [k, v] of Object.entries(req.query)) url.searchParams.set(k, v);
-  url.searchParams.set('apiKey', GEOAPIFY_KEY);
+  const { provider = 'geoapify', startLon, startLat, endLon, endLat, hazmat } = req.query;
   try {
-    const r = await fetch(url);
-    const data = await r.json();
-    res.status(r.status).json(data);
-  } catch {
-    res.status(500).json({ error: 'Route error' });
+    if (provider === 'google') {
+      const url = new URL('https://maps.googleapis.com/maps/api/directions/json');
+      url.searchParams.set('origin', `${startLat},${startLon}`);
+      url.searchParams.set('destination', `${endLat},${endLon}`);
+      url.searchParams.set('key', GOOGLE_KEY);
+      const r = await fetch(url);
+      if (!r.ok) return res.status(r.status).end();
+      const j = await r.json();
+      const poly = j.routes?.[0]?.overview_polyline?.points;
+      if (!poly) return res.status(500).json({ error: 'No route' });
+      const geometry = { type: 'LineString', coordinates: decodePolyline(poly) };
+      return res.json({ geometry });
+    } else {
+      const url = new URL('https://api.geoapify.com/v1/routing');
+      url.searchParams.set('waypoints', `${startLon},${startLat}|${endLon},${endLat}`);
+      url.searchParams.set('mode', 'drive');
+      url.searchParams.set('vehicle', 'truck');
+      url.searchParams.set('truckHeight', '4.115');
+      url.searchParams.set('truckWidth', '2.59');
+      url.searchParams.set('truckLength', '22.86');
+      url.searchParams.set('truckWeight', '36287');
+      if (hazmat === 'true') url.searchParams.set('hazmat', 'true');
+      url.searchParams.set('details', 'instruction_details');
+      url.searchParams.set('apiKey', GEOAPIFY_KEY);
+      const r = await fetch(url);
+      if (!r.ok) return res.status(r.status).end();
+      const j = await r.json();
+      const geometry = j.features?.[0]?.geometry;
+      if (!geometry) return res.status(500).json({ error: 'No route' });
+      return res.json({ geometry });
+    }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 
 app.get('/places', async (req, res) => {
-  const url = new URL('https://api.geoapify.com/v2/places');
-  for (const [k, v] of Object.entries(req.query)) url.searchParams.set(k, v);
-  url.searchParams.set('apiKey', GEOAPIFY_KEY);
+  const { provider = 'geoapify' } = req.query;
   try {
-    const r = await fetch(url);
-    const data = await r.json();
-    res.status(r.status).json(data);
-  } catch {
-    res.status(500).json({ error: 'Places error' });
+    if (provider === 'google') {
+      const { lat, lon, radius = '5000' } = req.query;
+      const url = new URL('https://maps.googleapis.com/maps/api/place/nearbysearch/json');
+      url.searchParams.set('location', `${lat},${lon}`);
+      url.searchParams.set('radius', radius);
+      url.searchParams.set('keyword', 'truck stop');
+      url.searchParams.set('type', 'gas_station');
+      url.searchParams.set('key', GOOGLE_KEY);
+      const r = await fetch(url);
+      if (!r.ok) return res.status(r.status).end();
+      const j = await r.json();
+      return res.json(j);
+    } else {
+      const { minLon, minLat, maxLon, maxLat } = req.query;
+      const url = new URL('https://api.geoapify.com/v2/places');
+      url.searchParams.set('categories', 'service.vehicle.fuel,transport.truck_stop');
+      url.searchParams.set('filter', `rect:${minLon},${minLat},${maxLon},${maxLat}`);
+      url.searchParams.set('limit', '500');
+      url.searchParams.set('apiKey', GEOAPIFY_KEY);
+      const r = await fetch(url);
+      if (!r.ok) return res.status(r.status).end();
+      const j = await r.json();
+      return res.json(j);
+    }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 
