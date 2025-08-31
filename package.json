@@ -1,17 +1,19 @@
 diff --git a//dev/null b/package.json
-index 0000000000000000000000000000000000000000..7b81967370eed685b364f6fbcabcd7ea14c102f5 100644
+index 0000000000000000000000000000000000000000..8429d9aa686c1bb9bc669bad8a76bf6a09c4c6b1 100644
 --- a//dev/null
 +++ b/package.json
-@@ -0,0 +1,12 @@
+@@ -0,0 +1,14 @@
 +{
 +  "name": "fuel-route-planner",
 +  "version": "1.0.0",
-+  "type": "module",
++  "description": "A self-contained web app for planning semi-truck fuel routes with: - **Truck-aware routing** (Geoapify Routing API) - **Fuel stop discovery** (Geoapify Places API) - **Diesel price estimates** from the **U.S. Energy Information Administration (EIA)** - **AI-based recommendations** that adjust for weight, terrain, governed speed, wind, and reserve buffer.",
 +  "main": "server.js",
 +  "scripts": {
-+    "start": "node server.js"
++    "start": "node server.js",
++    "test": "node -c server.js"
 +  },
-+  "dependencies": {
-+    "express": "^4.18.2"
-+  }
++  "keywords": [],
++  "author": "",
++  "license": "ISC",
++  "type": "commonjs"
 +}
