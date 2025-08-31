@@ -64,49 +64,59 @@
       </div>
     </header>
 
-      <section class="card" style="margin-top:12px">
-        <div class="row">
-          <label><span class="small muted">Start (exact address OK)</span>
-            <input id="start" placeholder="6418 Centennial Blvd, Nashville, TN 37209" list="startList" autocomplete="off" />
-            <datalist id="startList"></datalist>
+    <section class="card" style="margin-top:12px">
+      <h2>Favorites</h2>
+      <div id="favorites"></div>
+    </section>
+
+    <section class="card" style="margin-top:12px">
+      <h2>Recent Routes</h2>
+      <div id="history"></div>
+    </section>
+
+    <section class="card" style="margin-top:12px">
+      <div class="row">
+        <label><span class="small muted">Start (exact address OK)</span>
+          <input id="start" placeholder="6418 Centennial Blvd, Nashville, TN 37209" list="startList" autocomplete="off" />
+          <datalist id="startList"></datalist>
+        </label>
+        <label><span class="small muted">Destination (exact address OK)</span>
+          <input id="destination" placeholder="2594 US‑301, Dunn, NC 28334" list="destinationList" autocomplete="off" />
+          <datalist id="destinationList"></datalist>
+        </label>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label><span class="small muted">Fuel level (gal)</span>
+          <input id="fuelLevel" type="number" step="0.1" value="40" />
+        </label>
+      </div>
+      <div id="advancedFields" style="display:none;margin-top:8px">
+        <div class="row-3">
+          <label><span class="small muted">Vehicle load weight (lbs, optional)</span>
+            <input id="vehicleLoadWeight" type="number" step="100" placeholder="80000" />
           </label>
-          <label><span class="small muted">Destination (exact address OK)</span>
-            <input id="destination" placeholder="2594 US‑301, Dunn, NC 28334" list="destinationList" autocomplete="off" />
-            <datalist id="destinationList"></datalist>
+          <label><span class="small muted">Governed speed (mph)</span>
+            <input id="governedSpeed" type="number" step="1" value="70" />
+          </label>
+          <label><span class="small muted">Driver cost ($/hr)</span>
+            <input id="driverCostPerHour" type="number" step="1" value="122" />
           </label>
         </div>
-        <div class="row" style="margin-top:8px">
-          <label><span class="small muted">Fuel level (gal)</span>
-            <input id="fuelLevel" type="number" step="0.1" value="40" />
-          </label>
-        </div>
-        <div id="advancedFields" style="display:none;margin-top:8px">
-          <div class="row-3">
-            <label><span class="small muted">Vehicle load weight (lbs, optional)</span>
-              <input id="vehicleLoadWeight" type="number" step="100" placeholder="80000" />
-            </label>
-            <label><span class="small muted">Governed speed (mph)</span>
-              <input id="governedSpeed" type="number" step="1" value="70" />
-            </label>
-            <label><span class="small muted">Driver cost ($/hr)</span>
-              <input id="driverCostPerHour" type="number" step="1" value="122" />
-            </label>
-          </div>
-        </div>
-        <input id="mpg" type="hidden" value="8" />
-        <input id="tank" type="hidden" value="160" />
-        <input id="reserve" type="hidden" value="25" />
-        <input id="terrain" type="hidden" value="rolling" />
-        <input id="wind" type="hidden" value="0" />
-        <div style="margin-top:8px">
-          <button id="toggleAdvanced" type="button" class="btn">Show Advanced</button>
-        </div>
-        <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-top:8px">
-          <button id="planBtn" type="button" class="btn primary">Plan Route</button>
-          <button id="resetBtn" type="button" class="btn">Reset</button>
-          <span id="alerts" class="small muted"></span>
-        </div>
-      </section>
+      </div>
+      <input id="mpg" type="hidden" value="8" />
+      <input id="tank" type="hidden" value="160" />
+      <input id="reserve" type="hidden" value="25" />
+      <input id="terrain" type="hidden" value="rolling" />
+      <input id="wind" type="hidden" value="0" />
+      <div style="margin-top:8px">
+        <button id="toggleAdvanced" type="button" class="btn">Show Advanced</button>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-top:8px">
+        <button id="planBtn" type="button" class="btn primary">Plan Route</button>
+        <button id="resetBtn" type="button" class="btn">Reset</button>
+        <span id="alerts" class="small muted"></span>
+      </div>
+    </section>
 
     <section class="card" style="margin-top:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -423,14 +433,56 @@
         });
       }
 
+      // Favorites and History
+      async function loadStored(){
+        try{
+          const [hist, fav] = await Promise.all([
+            fetch('/api/routes').then(r=>r.json()),
+            fetch('/api/favorites').then(r=>r.json())
+          ]);
+          renderHistory(hist);
+          renderFavorites(fav);
+        }catch(e){ console.error(e); }
+      }
+      function renderHistory(items){
+        const host=$('history'); host.innerHTML='';
+        if(!items.length){ host.innerHTML='<div class="muted">No recent routes</div>'; return; }
+        items.forEach(r=>{
+          const row=document.createElement('div'); row.className='station';
+          row.innerHTML=`<div>${r.start} → ${r.end}</div><button data-id="${r.id}" class="btn small favbtn">${r.favorite?'Unfavorite':'Favorite'}</button>`;
+          host.appendChild(row);
+        });
+        host.querySelectorAll('.favbtn').forEach(btn=>{
+          btn.onclick=async()=>{
+            const id=btn.getAttribute('data-id');
+            if(btn.textContent==='Favorite'){
+              await fetch('/api/favorites',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+            }else{
+              await fetch('/api/favorites/'+id,{method:'DELETE'});
+            }
+            await loadStored();
+          };
+        });
+      }
+      function renderFavorites(items){
+        const host=$('favorites'); host.innerHTML='';
+        if(!items.length){ host.innerHTML='<div class="muted">No favorites</div>'; return; }
+        items.forEach(r=>{
+          const row=document.createElement('div'); row.className='station';
+          row.innerHTML=`<div>${r.start} → ${r.end}</div>`;
+          host.appendChild(row);
+        });
+      }
+
       // Plan handler
       async function plan(){
         try{
           $('loading').style.display='flex';
           note('','');
-            const startQ=$('start').value.trim(); const destQ=$('destination').value.trim();
-            if(!startQ||!destQ){ note('error','Please enter both <b>Start</b> and <b>Destination</b>.'); return; }
-            const [a,b]=await Promise.all([geocode(startQ), geocode(destQ)]);
+          const startQ=$('start').value.trim();
+          const endQ=$('destination').value.trim();
+          if(!startQ||!endQ){ note('error','Please enter both <b>Start</b> and <b>Destination</b>.'); return; }
+          const [a,b]=await Promise.all([geocode(startQ), geocode(endQ)]);
           let geo=null;
           try { geo = await routeGeoapify(a,b); } catch(_) { geo = await routeOSRM(a,b); }
           const detour = readDetour();
@@ -445,6 +497,9 @@
           renderStations(geo, stns);
           note('ok','Route and stations loaded.');
 
+          await fetch('/api/routes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({start:startQ,end:endQ})});
+          await loadStored();
+
           $('recoBtn').onclick=()=>{ const out=aiRecommend(geo, stns); renderPlan(out); };
         }catch(e){
           note('error', e.message);
@@ -454,11 +509,12 @@
       }
 
       // Wire up UI
-        $('planBtn').onclick=async()=>{ const btn=$('planBtn'); btn.disabled=true; btn.textContent='Planning…'; try{ await plan(); } finally { btn.disabled=false; btn.textContent='Plan Route'; } };
-        $('resetBtn').onclick=()=>location.reload();
-        $('sortBy').onchange=plan; $('chainFilter').onchange=plan; $('provider').onchange=plan;
-        $('toggleAdvanced').onclick=()=>{ const adv=$('advancedFields'); const show=adv.style.display!=='none'; adv.style.display=show?'none':'block'; $('toggleAdvanced').textContent=show?'Show Advanced':'Hide Advanced'; };
-        attachAutocomplete('start','startList'); attachAutocomplete('destination','destinationList');
+      $('planBtn').onclick=async()=>{ const btn=$('planBtn'); btn.disabled=true; btn.textContent='Planning…'; try{ await plan(); } finally { btn.disabled=false; btn.textContent='Plan Route'; } };
+      $('resetBtn').onclick=()=>location.reload();
+      $('sortBy').onchange=plan; $('chainFilter').onchange=plan; $('provider').onchange=plan;
+      $('toggleAdvanced').onclick=()=>{ const adv=$('advancedFields'); const show=adv.style.display!=='none'; adv.style.display=show?'none':'block'; $('toggleAdvanced').textContent=show?'Show Advanced':'Hide Advanced'; };
+      attachAutocomplete('start','startList'); attachAutocomplete('destination','destinationList');
+      loadStored();
     </script>
   </div>
 </body>

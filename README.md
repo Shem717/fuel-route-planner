@@ -15,18 +15,21 @@ A self-contained web app for planning semi-truck fuel routes with:
 - **EIA integration**: Attaches state-average diesel prices (fallback to PADD or U.S. national average).
 - **AI Recommendation**: Suggests optimal stops, gallons to purchase, and estimated cost savings.
 - Loading spinner overlay while planning route.
+- **Favorites & History**: Backend stores last ten routes and allows marking favorites.
 
 ## Requirements
 - A modern web browser (Chrome, Edge, Firefox, Safari).
 - No build tools or external JS required — **single HTML file**.
 - Internet connection (to call Geoapify + EIA APIs).
+- Node.js runtime for the optional backend that saves favorites/history.
 
 ## Usage
-1. Open `fuel-route-planner.html` in your browser.
-2. Enter **Start** and **Destination**.
-3. Fill in vehicle parameters.
-4. Click **Plan Route**.
-5. Review station list + AI recommendations.
+1. `npm install` and `npm start` to launch the backend server (serves `index.html`).
+2. Open `http://localhost:3000` in your browser.
+3. Enter **Start** and **Destination**.
+4. Fill in vehicle parameters.
+5. Click **Plan Route**.
+6. Review station list, route history and favorites.
 
 Click **Reset** to clear inputs.
 
