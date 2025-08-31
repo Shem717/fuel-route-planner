@@ -12,6 +12,7 @@
     .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
     .row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
     .tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .react-component .lower-navigation{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
     input,select,button{font-size:14px}
     input,select{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:#0b1320;color:#e5e7eb}
     .btn{padding:10px 14px;border-radius:12px;border:1px solid var(--border);background:#14213a;color:#e5e7eb;cursor:pointer}
@@ -59,8 +60,19 @@
         <label>Max detour (mi)
           <input id="detour" type="number" step="0.5" value="5" style="width:120px" />
         </label>
+        <button id="themeToggle" type="button" class="btn">Light</button>
       </div>
     </header>
+
+    <section class="card" style="margin-top:12px">
+      <h2>Favorites</h2>
+      <div id="favorites"></div>
+    </section>
+
+    <section class="card" style="margin-top:12px">
+      <h2>Recent Routes</h2>
+      <div id="history"></div>
+    </section>
 
     <section class="card" style="margin-top:12px">
       <div class="row">
@@ -69,50 +81,40 @@
           <datalist id="startList"></datalist>
         </label>
         <label><span class="small muted">Destination (exact address OK)</span>
-          <input id="end" placeholder="2594 US‑301, Dunn, NC 28334" list="endList" autocomplete="off" />
-          <datalist id="endList"></datalist>
+          <input id="destination" placeholder="2594 US‑301, Dunn, NC 28334" list="destinationList" autocomplete="off" />
+          <datalist id="destinationList"></datalist>
         </label>
       </div>
-      <div class="row-3" style="margin-top:8px">
-        <label><span class="small muted">Base MPG</span>
-          <input id="mpg" type="number" step="0.1" value="8" />
-        </label>
-        <label><span class="small muted">Tank size (gal)</span>
-          <input id="tank" type="number" step="1" value="160" />
-        </label>
-        <label><span class="small muted">Current fuel</span>
-          <div class="row" style="grid-template-columns:2fr 1fr">
-            <input id="fuelVal" type="number" step="0.1" value="40" />
-            <select id="fuelUnit"><option value="gal">gal</option><option value="pct">% of tank</option></select>
-          </div>
+      <div class="row" style="margin-top:8px">
+        <label><span class="small muted">Fuel level (gal)</span>
+          <input id="fuelLevel" type="number" step="0.1" value="40" />
         </label>
       </div>
-      <div class="row-3" style="margin-top:8px">
-        <label><span class="small muted">Reserve buffer (miles)</span>
-          <input id="reserve" type="number" step="1" value="25" />
-        </label>
-        <label><span class="small muted">Gross weight (lbs, optional)</span>
-          <input id="weight" type="number" step="100" placeholder="80000" />
-        </label>
-        <label><span class="small muted">Terrain</span>
-          <select id="terrain"><option value="flat">Flat</option><option value="rolling" selected>Rolling</option><option value="hilly">Hilly</option><option value="mountain">Mountain</option></select>
-        </label>
-      </div>
-      <div class="row-3" style="margin-top:8px">
-        <label><span class="small muted">Governed speed (mph)</span>
-          <input id="govSpeed" type="number" step="1" value="70" />
-        </label>
-        <label><span class="small muted">Headwind (mph, optional)</span>
-          <input id="wind" type="number" step="1" placeholder="0" />
-        </label>
-        <label><span class="small muted">Driver cost ($/hr)</span>
-          <input id="driverCost" type="number" step="1" value="122" />
-        </label>
-        <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap">
-          <button id="planBtn" type="button" class="btn primary">Plan Route</button>
-          <button id="resetBtn" type="button" class="btn">Reset</button>
-          <span id="alerts" class="small muted"></span>
+      <div id="advancedFields" style="display:none;margin-top:8px">
+        <div class="row-3">
+          <label><span class="small muted">Vehicle load weight (lbs, optional)</span>
+            <input id="vehicleLoadWeight" type="number" step="100" placeholder="80000" />
+          </label>
+          <label><span class="small muted">Governed speed (mph)</span>
+            <input id="governedSpeed" type="number" step="1" value="70" />
+          </label>
+          <label><span class="small muted">Driver cost ($/hr)</span>
+            <input id="driverCostPerHour" type="number" step="1" value="122" />
+          </label>
         </div>
+      </div>
+      <input id="mpg" type="hidden" value="8" />
+      <input id="tank" type="hidden" value="160" />
+      <input id="reserve" type="hidden" value="25" />
+      <input id="terrain" type="hidden" value="rolling" />
+      <input id="wind" type="hidden" value="0" />
+      <div style="margin-top:8px">
+        <button id="toggleAdvanced" type="button" class="btn">Show Advanced</button>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-top:8px">
+        <button id="planBtn" type="button" class="btn primary">Plan Route</button>
+        <button id="resetBtn" type="button" class="btn">Reset</button>
+        <span id="alerts" class="small muted"></span>
       </div>
     </section>
 
@@ -136,10 +138,37 @@
     </section>
 
     <script>
-      const $=id=>document.getElementById(id);
-      const MI_PER_M=1/1609.344; 
-      const GEOAPIFY_KEY='9a30d1fe0c684c489f1ff7f506e9a1ff'; 
-      const EIA_KEY='xfGagmkwAlzScExC639DPUctyuWheqZSQPfxErvu';
+      const $ = id => document.getElementById(id);
+      const MI_PER_M = 1 / 1609.344;
+      const GEOAPIFY_KEY = '...';
+      const EIA_KEY = '...';
+      const themeBtn = $('themeToggle');
+      function applyTheme(mode) {
+        const root = document.documentElement;
+        if (mode === 'light') {
+          root.style.setProperty('--bg', '#ffffff');
+          root.style.setProperty('--panel', '#f1f5f9');
+          root.style.setProperty('--muted', '#64748b');
+          root.style.setProperty('--text', '#1e293b');
+          root.style.setProperty('--accent', '#3b82f6');
+          root.style.setProperty('--border', 'rgba(148,163,184,.3)');
+        } else {
+          root.style.setProperty('--bg', '#0b1120');
+          root.style.setProperty('--panel', '#0f172a');
+          root.style.setProperty('--muted', '#94a3b8');
+          root.style.setProperty('--text', '#e5e7eb');
+          root.style.setProperty('--accent', '#3b82f6');
+          root.style.setProperty('--border', 'rgba(148,163,184,.18)');
+        }
+        localStorage.setItem('theme', mode);
+        themeBtn.textContent = mode === 'light' ? 'Dark' : 'Light';
+      }
+      applyTheme(localStorage.getItem('theme') || 'dark');
+      themeBtn.onclick = () => {
+        const next = themeBtn.textContent === 'Light' ? 'light' : 'dark';
+        applyTheme(next);
+      };
+
       function note(kind,msg){ const el=$('alerts'); el.className = 'small '+(kind==='ok'?'ok':kind==='error'?'error':'muted'); el.innerHTML=msg; }
 
       // Autocomplete (Geoapify)
@@ -152,11 +181,11 @@
           if(q.length<3){ list.innerHTML=''; return; }
           suggestTimer=setTimeout(async()=>{
             try{
-              const u=new URL('https://api.geoapify.com/v1/geocode/autocomplete');
+              const u=new URL('/geocode', location.origin);
+              u.searchParams.set('type','autocomplete');
               u.searchParams.set('text', q);
               u.searchParams.set('limit','8');
-              u.searchParams.set('apiKey', GEOAPIFY_KEY);
-              const j=await fetch(u.toString()).then(r=>r.json());
+              const j=await fetch(u).then(r=>r.json());
               const uniq=[...new Set((j.features||[]).map(f=>f.properties.formatted))];
               list.innerHTML=uniq.map(v=>`<option value="${v}"></option>`).join('');
             }catch{}
@@ -166,11 +195,10 @@
 
       // Geocode + routing (Geoapify fallback to OSRM)
       async function geocode(q){
-        const u=new URL('https://api.geoapify.com/v1/geocode/search');
+        const u=new URL('/geocode', location.origin);
         u.searchParams.set('text', q);
         u.searchParams.set('limit','1');
-        u.searchParams.set('apiKey', GEOAPIFY_KEY);
-        const j=await fetch(u.toString()).then(r=>r.json());
+        const j=await fetch(u).then(r=>r.json());
         const f=j.features?.[0];
         if(!f) throw new Error('Location not found: '+q);
         return [f.geometry.coordinates[0], f.geometry.coordinates[1]];
@@ -184,15 +212,14 @@
       async function routeGeoapify(start,end){
         const truckHeightM = 4.115, truckWidthM=2.59, truckLengthM=22.86, truckWeightKg=36287;
         const haz = $('hazmat')? $('hazmat').checked:false;
-        const u=new URL('https://api.geoapify.com/v1/routing');
+        const u=new URL('/route', location.origin);
         u.searchParams.set('waypoints', `${start[0]},${start[1]}|${end[0]},${end[1]}`);
         u.searchParams.set('mode','drive'); u.searchParams.set('vehicle','truck');
         u.searchParams.set('truckHeight',truckHeightM); u.searchParams.set('truckWidth',truckWidthM);
         u.searchParams.set('truckLength',truckLengthM); u.searchParams.set('truckWeight',truckWeightKg);
         if(haz) u.searchParams.set('hazmat','true');
         u.searchParams.set('details','instruction_details');
-        u.searchParams.set('apiKey',GEOAPIFY_KEY);
-        const r=await fetch(u.toString());
+        const r=await fetch(u);
         if(!r.ok) throw new Error('Geoapify routing error '+r.status);
         const j=await r.json();
         if(!j?.features?.[0]) throw new Error('Geoapify routing: no route returned');
@@ -239,12 +266,11 @@
         for(const b of boxes){
           const degPerMiLat=1/69.0, degPerMiLon=1/(69.172*Math.cos(b.meanLat*Math.PI/180));
           const padLon=Math.max(detourMi,5)*degPerMiLon, padLat=Math.max(detourMi,5)*degPerMiLat;
-          const url=new URL('https://api.geoapify.com/v2/places');
+          const url=new URL('/places', location.origin);
           url.searchParams.set('categories','service.vehicle.fuel,transport.truck_stop');
           url.searchParams.set('filter',`rect:${b.minLon-padLon},${b.minLat-padLat},${b.maxLon+padLon},${b.maxLat+padLat}`);
           url.searchParams.set('limit','500');
-          url.searchParams.set('apiKey',GEOAPIFY_KEY);
-          const r=await fetch(url.toString());
+          const r=await fetch(url);
           if(!r.ok) throw new Error('Places error '+r.status);
           const j=await r.json();
           feats.push(...(j.features||[]));
@@ -267,8 +293,11 @@
       // EIA prices (state → PADD → US)
       const STATE_TO_PADD={ CT:'R1A',ME:'R1A',MA:'R1A',NH:'R1A',RI:'R1A',VT:'R1A', DE:'R1B',DC:'R1B',MD:'R1B',NJ:'R1B',NY:'R1B',PA:'R1B', FL:'R1C',GA:'R1C',NC:'R1C',SC:'R1C',VA:'R1C',WV:'R1C', IL:'R20',IN:'R20',IA:'R20',KS:'R20',KY:'R20',MI:'R20',MN:'R20',MO:'R20',NE:'R20',ND:'R20',OH:'R20',OK:'R20',SD:'R20',TN:'R20',WI:'R20', AL:'R30',AR:'R30',LA:'R30',MS:'R30',NM:'R30',TX:'R30', CO:'R40',ID:'R40',MT:'R40',UT:'R40',WY:'R40', AK:'R50',AZ:'R50',CA:'R50',HI:'R50',NV:'R50',OR:'R50',WA:'R50' };
       async function eiaLatest(area, product='EPD2D', series){ const s = series|| (area.startsWith('R')||area==='NUS' ? 'dpr' : 'gnd');
-        const url=`https://api.eia.gov/v2/petroleum/pri/${s}/data/?api_key=${EIA_KEY}&frequency=weekly&data[0]=value&facets[product][]=${product}&facets[area][]=${area}&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=1`;
-        const r=await fetch(url); if(!r.ok) throw new Error('EIA '+r.status); const j=await r.json(); return j?.response?.data?.[0]?.value ?? null; }
+        const u=new URL('/prices', location.origin);
+        u.searchParams.set('area', area);
+        u.searchParams.set('product', product);
+        u.searchParams.set('series', s);
+        const r=await fetch(u); if(!r.ok) throw new Error('Prices '+r.status); const j=await r.json(); return j?.value ?? null; }
       async function enrichWithEIA(stations){
         const groups={}; stations.forEach(s=>{ const st=s.state||''; (groups[st] ||= []).push(s); });
         const cache=new Map();
@@ -285,15 +314,15 @@
 
       // Vehicle + AI planner
       function readVehicle(){
-        const tank=parseFloat($('tank').value||'160');
-        let fuel=parseFloat($('fuelVal').value||'0'); if(($('fuelUnit').value||'gal')==='pct') fuel = tank*(fuel/100);
-        const reserve=parseFloat($('reserve').value||'0');
-        const mpgBase=parseFloat($('mpg').value||'8');
-        const weight=parseFloat($('weight').value||'80000');
-        const terrain=$('terrain').value||'rolling';
-        const govSpeed=parseFloat($('govSpeed').value||'70');
-        const wind=parseFloat($('wind').value||'0');
-        const driverCost=parseFloat($('driverCost').value||'122');
+          const tank=parseFloat($('tank').value||'160');
+          let fuel=parseFloat($('fuelLevel').value||'0');
+          const reserve=parseFloat($('reserve').value||'0');
+          const mpgBase=parseFloat($('mpg').value||'8');
+          const weight=parseFloat($('vehicleLoadWeight').value||'80000');
+          const terrain=$('terrain').value||'rolling';
+          const govSpeed=parseFloat($('governedSpeed').value||'70');
+          const wind=parseFloat($('wind').value||'0');
+          const driverCost=parseFloat($('driverCostPerHour').value||'122');
         const terrainFactor = {flat:1.00, rolling:0.95, hilly:0.90, mountain:0.80}[terrain]||0.95;
         const weightFactor = Math.max(0.7, 1 - Math.max(0, (weight-60000))/10000*0.03);
         const speedFactor = Math.max(0.7, 1 - Math.max(0, (govSpeed-60))/5*0.02);
@@ -404,12 +433,54 @@
         });
       }
 
+      // Favorites and History
+      async function loadStored(){
+        try{
+          const [hist, fav] = await Promise.all([
+            fetch('/api/routes').then(r=>r.json()),
+            fetch('/api/favorites').then(r=>r.json())
+          ]);
+          renderHistory(hist);
+          renderFavorites(fav);
+        }catch(e){ console.error(e); }
+      }
+      function renderHistory(items){
+        const host=$('history'); host.innerHTML='';
+        if(!items.length){ host.innerHTML='<div class="muted">No recent routes</div>'; return; }
+        items.forEach(r=>{
+          const row=document.createElement('div'); row.className='station';
+          row.innerHTML=`<div>${r.start} → ${r.end}</div><button data-id="${r.id}" class="btn small favbtn">${r.favorite?'Unfavorite':'Favorite'}</button>`;
+          host.appendChild(row);
+        });
+        host.querySelectorAll('.favbtn').forEach(btn=>{
+          btn.onclick=async()=>{
+            const id=btn.getAttribute('data-id');
+            if(btn.textContent==='Favorite'){
+              await fetch('/api/favorites',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+            }else{
+              await fetch('/api/favorites/'+id,{method:'DELETE'});
+            }
+            await loadStored();
+          };
+        });
+      }
+      function renderFavorites(items){
+        const host=$('favorites'); host.innerHTML='';
+        if(!items.length){ host.innerHTML='<div class="muted">No favorites</div>'; return; }
+        items.forEach(r=>{
+          const row=document.createElement('div'); row.className='station';
+          row.innerHTML=`<div>${r.start} → ${r.end}</div>`;
+          host.appendChild(row);
+        });
+      }
+
       // Plan handler
       async function plan(){
         try{
           $('loading').style.display='flex';
           note('','');
-          const startQ=$('start').value.trim(); const endQ=$('end').value.trim();
+          const startQ=$('start').value.trim();
+          const endQ=$('destination').value.trim();
           if(!startQ||!endQ){ note('error','Please enter both <b>Start</b> and <b>Destination</b>.'); return; }
           const [a,b]=await Promise.all([geocode(startQ), geocode(endQ)]);
           let geo=null;
@@ -426,6 +497,9 @@
           renderStations(geo, stns);
           note('ok','Route and stations loaded.');
 
+          await fetch('/api/routes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({start:startQ,end:endQ})});
+          await loadStored();
+
           $('recoBtn').onclick=()=>{ const out=aiRecommend(geo, stns); renderPlan(out); };
         }catch(e){
           note('error', e.message);
@@ -438,7 +512,9 @@
       $('planBtn').onclick=async()=>{ const btn=$('planBtn'); btn.disabled=true; btn.textContent='Planning…'; try{ await plan(); } finally { btn.disabled=false; btn.textContent='Plan Route'; } };
       $('resetBtn').onclick=()=>location.reload();
       $('sortBy').onchange=plan; $('chainFilter').onchange=plan; $('provider').onchange=plan;
-      attachAutocomplete('start','startList'); attachAutocomplete('end','endList');
+      $('toggleAdvanced').onclick=()=>{ const adv=$('advancedFields'); const show=adv.style.display!=='none'; adv.style.display=show?'none':'block'; $('toggleAdvanced').textContent=show?'Show Advanced':'Hide Advanced'; };
+      attachAutocomplete('start','startList'); attachAutocomplete('destination','destinationList');
+      loadStored();
     </script>
   </div>
 </body>
