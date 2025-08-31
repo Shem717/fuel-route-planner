@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import RouteForm from './components/RouteForm';
 import StationList from './components/StationList';
 import PlanSummary from './components/PlanSummary';
+import Layout from './components/Layout';
 import { Station, PlanResult, RouteFormValues } from './types';
 
 const App: React.FC = () => {
@@ -32,11 +33,11 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="wrap">
+    <Layout>
       <RouteForm onPlan={handlePlan} />
       <StationList stations={stations} />
       <PlanSummary result={plan} />
-    </div>
+    </Layout>
   );
 };
 
