@@ -6,21 +6,30 @@ interface Props {
 }
 
 const PlanSummary: React.FC<Props> = ({ result }) => (
-  <section className="card" style={{ marginTop: 12 }}>
+  <section className="card mt-3">
     <h2>Plan Summary</h2>
     {!result ? (
       <div className="muted">No plan calculated.</div>
     ) : (
       <>
-        <div className="kvs">
-          <div>Effective MPG</div>
-          <div className="mono">{result.mpgEff.toFixed(2)}</div>
-          <div>Max range (full tank)</div>
-          <div className="mono">{result.maxRange.toFixed(0)} mi</div>
-          <div>Total route</div>
-          <div className="mono">{result.totalMiles.toFixed(0)} mi</div>
+        <div className="metrics">
+          <div className="metric">
+            <span>Effective MPG</span>
+            <span className="mono">{result.mpgEff.toFixed(2)}</span>
+            <div className="progress"><div className="progress-bar" style={{width: `${Math.min((result.mpgEff/15)*100,100)}%`}}></div></div>
+          </div>
+          <div className="metric">
+            <span>Max range</span>
+            <span className="mono">{result.maxRange.toFixed(0)} mi</span>
+            <div className="progress"><div className="progress-bar" style={{width: '100%'}}></div></div>
+          </div>
+          <div className="metric">
+            <span>Total route</span>
+            <span className="mono">{result.totalMiles.toFixed(0)} mi</span>
+            <div className="progress"><div className="progress-bar" style={{width: `${Math.min((result.totalMiles/result.maxRange)*100,100)}%`}}></div></div>
+          </div>
         </div>
-        <div className="list" style={{ marginTop: 8 }}>
+        <div className="list mt-2">
           {result.plan.length === 0 ? (
             <div className="muted">No actions needed.</div>
           ) : (
